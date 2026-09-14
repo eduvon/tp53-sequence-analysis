@@ -1,4 +1,12 @@
 import subprocess
+from collections import Counter
+
+# Constants
+
+VCF_FILE = "clinvar_20260905.vcf.gz"
+TP53_REGION = "17:7668421-7687490"
+TP53_START = 7668421
+BIN_SIZE = 1000
 
 result = subprocess.run(
     ["tabix", "clinvar_20260905.vcf.gz", "17:7668421-7687490"],
@@ -6,12 +14,7 @@ result = subprocess.run(
     text=True
 )
 
-# print("Return code:", result.returncode)
-
-# if result.returncode != 0:
-#     print("Error:", result.stderr)
-# else:
-#     print("Output:", result.stdout.splitlines()[0])
+# Functions
 
 def parse_vcf_record(line):
     fields = line.split("\t")
@@ -22,11 +25,11 @@ def parse_vcf_record(line):
     alt = fields[4]
     info = fields[7]
 
-    data =info.split(";")
+    data = info.split(";")
     data_dict = dict(item.split("=", 1) for item in data)
 
     consequences = []
-    
+
     if "MC" in data_dict:
         for consequence in data_dict["MC"].split(","):
             description = consequence.split("|")[1]
@@ -44,54 +47,52 @@ def parse_vcf_record(line):
         "position": position,
         "ref": ref,
         "alt": alt,
-        "clinical_significance": data_dict.get('CLNSIG'),
+        "clinical_significance": data_dict.get("CLNSIG"),
         "consequences": consequences,
-        "rs": rs
+        "rs": rs,
+        "genomic_hgvs": data_dict.get("CLNHGVS"),
     }
 
-variants = []
+def get_tp53_variants():
+    result = subprocess.run(
+        ["tabix", VCF_FILE, TP53_REGION],
+        capture_output=True,
+        text=True
+    )
 
-for line in result.stdout.splitlines():
-    variant = parse_vcf_record(line)
-    variants.append(variant)
+    variants = []
 
-# from collections import Counter
+    for line in result.stdout.splitlines():
+        variant = parse_vcf_record(line)
+        variants.append(variant)
 
-# significances = []
+    return variants
 
-# for variant in variants:
-#     significances.append(variant["clinical_significance"])
+def calculate_genomic_bins(variants):
+    bins = []
 
-# counts = Counter(significances)
+    for variant in variants:
+        bin_number = (variant["position"] - TP53_START) // BIN_SIZE
+        bins.append(bin_number)
 
-# print(counts)
-
-bins = []
-start = 7668421
-
-for variant in variants:
-    bin_number = (variant["position"] - start) // 1000
-    bins.append(bin_number)
-
-from collections import Counter
-
-bin_counts = Counter(bins)
-
-for item in bin_counts.items():
-    bin_number = item[0]
-    num_variants = item[1]
-    genomic_start = start + (bin_number * 1000)
-    genomic_end = genomic_start + 999
-
-    print(f"Bin {bin_number}: {genomic_start}-{genomic_end} -> {num_variants} variants")
+    return Counter(bins)
 
 
-# import matplotlib.pyplot as plt
+# Main analysis
 
-# plt.bar(bin_counts.keys(), bin_counts.values())
+variants = get_tp53_variants()
 
-# plt.xlabel("Genomic bin")
-# plt.ylabel("Number of variants")
-# plt.title("ClinVar TP53 variants by genomic bin")
+print(f"Number of variants: {len(variants)}")
 
-# plt.show()
+bin_counts = calculate_genomic_bins(variants)
+
+for bin_number, num_variants in sorted(bin_counts.items()):
+    genomic_start = TP53_START + (bin_number * BIN_SIZE)
+    genomic_end = genomic_start + BIN_SIZE - 1
+
+    print(
+        f"Bin {bin_number}: "
+        f"{genomic_start}-{genomic_end} -> "
+        f"{num_variants} variants"
+    )
+
