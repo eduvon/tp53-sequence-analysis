@@ -55,13 +55,43 @@ for line in result.stdout.splitlines():
     variant = parse_vcf_record(line)
     variants.append(variant)
 
-from collections import Counter
+# from collections import Counter
 
-significances = []
+# significances = []
+
+# for variant in variants:
+#     significances.append(variant["clinical_significance"])
+
+# counts = Counter(significances)
+
+# print(counts)
+
+bins = []
+start = 7668421
 
 for variant in variants:
-    significances.append(variant["clinical_significance"])
+    bin_number = (variant["position"] - start) // 1000
+    bins.append(bin_number)
 
-counts = Counter(significances)
+from collections import Counter
 
-print(counts)
+bin_counts = Counter(bins)
+
+for item in bin_counts.items():
+    bin_number = item[0]
+    num_variants = item[1]
+    genomic_start = start + (bin_number * 1000)
+    genomic_end = genomic_start + 999
+
+    print(f"Bin {bin_number}: {genomic_start}-{genomic_end} -> {num_variants} variants")
+
+
+# import matplotlib.pyplot as plt
+
+# plt.bar(bin_counts.keys(), bin_counts.values())
+
+# plt.xlabel("Genomic bin")
+# plt.ylabel("Number of variants")
+# plt.title("ClinVar TP53 variants by genomic bin")
+
+# plt.show()
