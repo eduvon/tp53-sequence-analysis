@@ -3,6 +3,7 @@ def parse_vcf_record(line):
 
     chrom = fields[0]
     position = int(fields[1])
+    variant_id = fields[2]
     ref = fields[3]
     alt = fields[4]
     info = fields[7]
@@ -25,6 +26,7 @@ def parse_vcf_record(line):
         rs = None
 
     return {
+        "id": variant_id,
         "chrom": chrom,
         "position": position,
         "ref": ref,
